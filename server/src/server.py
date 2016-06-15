@@ -15,7 +15,9 @@ from models import db_session, create_all, init, User
 # to be carried out.  Some operations such as changing a user password will
 # require many different fields to be updated, this must be done in a single
 # request so that if the client disconnects the database cannot be left in a
-# half-updated state.
+# half-updated state.  Break out actual update logic into own method that does
+# not commit session.  Commit is then performed separately when all updates have
+# completed.
 #
 
 if __name__ == "__main__":
