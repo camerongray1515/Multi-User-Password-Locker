@@ -17,6 +17,7 @@ class User(Base):
     auth_hash = Column(String)
     encrypted_private_key = Column(Text)
     public_key = Column(Text)
+    admin = Column(Boolean)
 
     account_data_items = relationship("AccountDataItem",
         cascade="all, delete, delete-orphan", backref="user")
