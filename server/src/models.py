@@ -15,6 +15,8 @@ class User(Base):
     username = Column(String)
     email = Column(String)
     auth_hash = Column(String)
+    encrypted_private_key = Column(Text)
+    public_key = Column(Text)
 
     account_data_items = relationship("AccountDataItem",
         cascade="all, delete, delete-orphan", backref="user")
@@ -45,8 +47,6 @@ class AccountDataItem(Base):
     password = Column(Text)
     account_id = Column(Integer, ForeignKey("accounts.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
-    encrypted_private_key = Column(Text)
-    public_key = Column(Text)
     encrypted_aes_key = Column(Text)
 
     def __repr__(self):
