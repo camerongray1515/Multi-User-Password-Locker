@@ -18,6 +18,8 @@ class User(Base):
     encrypted_private_key = Column(Text)
     public_key = Column(Text)
     admin = Column(Boolean)
+    pbkdf2_salt = Column(Text)
+    aes_iv = Column(Text)
 
     account_data_items = relationship("AccountDataItem",
         cascade="all, delete, delete-orphan", backref="user")
