@@ -1,0 +1,4 @@
+{
+    "connection_string": "sqlite:///test.sqlite",
+    "key_length": 2048
+}
