@@ -35,9 +35,9 @@ server = Flask(__name__)
 def index(user):
     return jsonify([{"email": user.email}])
 
-@server.route("/folder/add/", methods=["PUT"])
+@server.route("/folders/add/", methods=["PUT"])
 @auth_required(admin_required=True)
-def folder_add(user):
+def folders_add(user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
             "add a folder")
@@ -77,9 +77,9 @@ def folder_add(user):
 
     return jsonify(success=True, added_folder_ids=added_folder_ids)
 
-@server.route("/folder/set_permissions/", methods=["POST"])
+@server.route("/folders/set_permissions/", methods=["POST"])
 @auth_required(admin_required=True)
-def folder_set_permissions(user):
+def folders_set_permissions(user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
             "edit the permissions on a folder")
@@ -146,9 +146,9 @@ def folder_set_permissions(user):
 
     return jsonify(success=True)
 
-@server.route("/folder/delete/<folder_id>/", methods=["DELETE"])
+@server.route("/folders/delete/<folder_id>/", methods=["DELETE"])
 @auth_required(admin_required=True)
-def folder_delete(folder_id, user):
+def folders_delete(folder_id, user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
             "add a folder")
@@ -160,3 +160,17 @@ def folder_delete(folder_id, user):
     db_session.commit()
 
     return jsonify(success=True)
+
+@server.route("/folders/", methods=["GET"])
+@auth_required()
+def folders(user):
+    ps = Permission.query.filter(Permission.user_id==user.id).filter(
+        Permission.read==True).all()
+
+    folders = []
+    for p in ps:
+        f = p.folder
+        folders.append({"id": f.id, "name": f.name, "read": p.read,
+            "write": p.write})
+
+    return jsonify(folders=folders)
