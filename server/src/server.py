@@ -145,3 +145,18 @@ def folder_set_permissions(user):
     db_session.commit()
 
     return jsonify(success=True)
+
+@server.route("/folder/delete/<folder_id>/", methods=["DELETE"])
+@auth_required(admin_required=True)
+def folder_delete(folder_id, user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "add a folder")
+
+    f = Folder.query.get(folder_id)
+    if not f:
+        return error_response("item_not_found", "Folder not found")
+    db_session.delete(f)
+    db_session.commit()
+
+    return jsonify(success=True)
