@@ -5,8 +5,13 @@ from decorators import auth_required
 server = Flask(__name__)
 
 # Methods required:
+#   - Create a new folder, only for admins
+#   - Set permissions for user on a folder, if read and write false, remove
+#       entry.  Only for admins
+#   - Add new account to a folder, only for users who can edit
+#   - Delete account, only for users who can edit
 #   - Get all public keys for an account, only for users who can edit
-#   - Update encrypted aes key for an account, only for users who can edit
+#   - Update encrypted data for an account, only for users who can edit
 #       or own account
 #   - Update public, encrypted private key pair and auth key (hashed server
 #       side), only for authenticated user
