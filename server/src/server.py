@@ -1,4 +1,4 @@
-from models import db_session, create_all, init, User, Folder
+from models import db_session, create_all, init, User, Folder, Permission
 from flask import Flask, jsonify, request, make_response
 from decorators import auth_required
 from validation import error_response, validate_schema
@@ -56,13 +56,19 @@ def folder_add(user):
     if error:
         return error
 
-    for f in request.json:
-        if Folder.query.filter(Folder.name==f.get("name")).count():
+    for folder in request.json:
+        if Folder.query.filter(Folder.name==folder.get("name")).count():
             db_session.rollback()
             return error_response("already_exists", "A folder with that name "
                 "already exists")
 
-        db_session.add(Folder(name=f.get("name")))
+        f = Folder(name=folder.get("name"))
+        db_session.add(f)
+
+        # Give the creating user read/write permissions to the folder
+        db_session.flush()
+        db_session.add(Permission(read=True, write=True, user_id=user.id,
+            folder_id=f.id))
 
     db_session.commit()
 
