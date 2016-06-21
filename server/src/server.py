@@ -35,7 +35,7 @@ server = Flask(__name__)
 def index(user):
     return jsonify([{"email": user.email}])
 
-@server.route("/folder/add/", methods=["POST"])
+@server.route("/folder/add/", methods=["PUT"])
 @auth_required(admin_required=True)
 def folder_add(user):
     if not user.admin:
@@ -48,7 +48,8 @@ def folder_add(user):
             "type": "object",
             "properties": {
                 "name": {"type": "string"}
-            }
+            },
+            "required": ["name"]
         }
     }
 
@@ -56,9 +57,9 @@ def folder_add(user):
     if error:
         return error
 
+    added_folder_ids = []
     for folder in request.json:
         if Folder.query.filter(Folder.name==folder.get("name")).count():
-            db_session.rollback()
             return error_response("already_exists", "A folder with that name "
                 "already exists")
 
@@ -69,6 +70,77 @@ def folder_add(user):
         db_session.flush()
         db_session.add(Permission(read=True, write=True, user_id=user.id,
             folder_id=f.id))
+
+        added_folder_ids.append(f.id)
+
+    db_session.commit()
+
+    return jsonify(success=True, added_folder_ids=added_folder_ids)
+
+@server.route("/folder/set_permissions/", methods=["POST"])
+@auth_required(admin_required=True)
+def folder_set_permissions(user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "edit the permissions on a folder")
+
+    schema = {
+        "type": "object",
+        "properies": {
+            "folder_id": {"type": "integer"},
+            "permissions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properies": {
+                        "user_id": {"type": "integer"},
+                        "read": {"type": "boolean"},
+                        "write": {"type": "boolean"}
+                    },
+                    "required": ["user_id", "read", "write"]
+                }
+            }
+        },
+        "required": ["folder_id", "permissions"]
+    }
+
+    error = validate_schema(request.json, schema)
+    if error:
+        return error
+
+    folder_id = request.json.get("folder_id")
+
+    if not Folder.query.filter(Folder.id==folder_id).count():
+        return error_response("item_not_found", "Folder not found")
+
+    for permission in request.json.get("permissions"):
+        user_id = permission.get("user_id")
+
+        if not User.query.filter(User.id==user_id).count():
+            return error_response("item_not_found", "User with ID {} not found"
+                "".format(user_id))
+
+        ps = Permission.query.filter(Permission.user_id==user_id).filter(
+            Permission.folder_id==folder_id).all()
+        p = ps[0] if ps else Permission()
+
+        # If no read or write, do not add permission and delete if exists
+        if not(permission.get("read") or permission.get("write")):
+            if ps:
+                db_session.delete(p)
+            continue
+
+        if permission.get("write") and not permission.get("read"):
+            return error_response("input_validation_fail", "Users must be able "
+                "to read a folder if they are to write to it")
+
+        p.user_id = user_id
+        p.folder_id = folder_id
+        p.read = permission.get("read")
+        p.write = permission.get("write")
+
+        if not ps:
+            db_session.add(p)
 
     db_session.commit()
 
