@@ -12,12 +12,9 @@ def auth_required(admin_required=False):
         @wraps(func)
         def decorated(*args, **kwargs):
             auth = request.authorization
-            print(auth)
             if not auth:
                 return fail_auth()
             u = User.query.filter(User.username==auth.username).all()
-            print(auth.username)
-            print(auth.password)
             if len(u) > 0:
                 user = u[0]
                 if bcrypt.hashpw(auth.password.encode("UTF-8"),
