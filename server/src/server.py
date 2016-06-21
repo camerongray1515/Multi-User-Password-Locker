@@ -1,6 +1,7 @@
-from models import db_session, create_all, init, User
-from flask import Flask, jsonify, request
+from models import db_session, create_all, init, User, Folder
+from flask import Flask, jsonify, request, make_response
 from decorators import auth_required
+from validation import error_response, validate_schema
 
 server = Flask(__name__)
 
@@ -31,5 +32,38 @@ server = Flask(__name__)
 
 @server.route("/")
 @auth_required(admin_required=True)
-def index():
-    return jsonify([{"foo": "bar"}])
+def index(user):
+    return jsonify([{"email": user.email}])
+
+@server.route("/folder/add/", methods=["POST"])
+@auth_required(admin_required=True)
+def folder_add(user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "add a folder")
+
+    schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            }
+        }
+    }
+
+    error = validate_schema(request.json, schema)
+    if error:
+        return error
+
+    for f in request.json:
+        if Folder.query.filter(Folder.name==f.get("name")).count():
+            db_session.rollback()
+            return error_response("already_exists", "A folder with that name "
+                "already exists")
+
+        db_session.add(Folder(name=f.get("name")))
+
+    db_session.commit()
+
+    return jsonify(success=True)
