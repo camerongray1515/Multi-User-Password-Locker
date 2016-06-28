@@ -22,6 +22,8 @@ def auth_required(admin_required=False):
                     if admin_required and not user.admin:
                         return fail_auth()
                     return func(*args, user=user, **kwargs)
+                else:
+                    return fail_auth()
             else:
                 return fail_auth()
 

@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import bcrypt
+import binascii
 from models import db_session, create_all, init, User
 from getpass import getpass
 from Crypto.PublicKey import RSA
@@ -59,10 +60,10 @@ def add_user():
     u.pbkdf2_salt = base64.b64encode(salt)
     u.aes_iv = base64.b64encode(iv)
 
-    auth_key = hashlib.sha512(
-        "{}${}".format(u.username, password).encode("UTF-8")).hexdigest()
+    auth_key = binascii.hexlify(hashlib.pbkdf2_hmac("sha512",
+        password.encode("UTF-8"), u.username.encode("UTF-8"), 100000))
 
-    u.auth_hash = bcrypt.hashpw(auth_key.encode("UTF-8"), bcrypt.gensalt())
+    u.auth_hash = bcrypt.hashpw(auth_key, bcrypt.gensalt())
 
     print("Done!")
     print("Adding user...", end="")
