@@ -30,11 +30,6 @@ server = Flask(__name__)
 # completed.
 #
 
-@server.route("/")
-@auth_required(admin_required=True)
-def index(user):
-    return jsonify([{"email": user.email}])
-
 @server.route("/folders/add/", methods=["PUT"])
 @auth_required(admin_required=True)
 def folders_add(user):
