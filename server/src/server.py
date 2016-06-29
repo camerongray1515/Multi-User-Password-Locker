@@ -31,7 +31,7 @@ server = Flask(__name__)
 #
 
 @server.route("/folders/add/", methods=["PUT"])
-@auth_required(admin_required=True)
+@auth_required
 def folders_add(user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
@@ -67,7 +67,7 @@ def folders_add(user):
     return jsonify(success=True, folder_id=f.id)
 
 @server.route("/folders/set_permissions/", methods=["POST"])
-@auth_required(admin_required=True)
+@auth_required
 def folders_set_permissions(user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
@@ -136,7 +136,7 @@ def folders_set_permissions(user):
     return jsonify(success=True)
 
 @server.route("/folders/delete/<folder_id>/", methods=["DELETE"])
-@auth_required(admin_required=True)
+@auth_required
 def folders_delete(folder_id, user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
@@ -151,7 +151,7 @@ def folders_delete(folder_id, user):
     return jsonify(success=True)
 
 @server.route("/folders/", methods=["GET"])
-@auth_required()
+@auth_required
 def folders(user):
     ps = Permission.query.filter(Permission.user_id==user.id).filter(
         Permission.read==True).all()
@@ -163,3 +163,35 @@ def folders(user):
             "write": p.write})
 
     return jsonify(folders=folders)
+
+@server.route("/users/", methods=["GET"])
+@server.route("/users/<user_id>/", methods=["GET"])
+@auth_required
+def get_user(user, user_id=None):
+    if not user_id:
+        user_id = user.id
+    user_id = int(user_id)
+
+    if user_id != user.id and not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "get a user other than yourself")
+
+    u = User.query.get(user_id)
+
+    if not u:
+        return error_response("item_not_found", "User not found")
+
+    user = {
+        "id": u.id,
+        "full_name": u.full_name,
+        "username": u.username,
+        "email": u.email,
+        "auth_hash": u.auth_hash,
+        "encrypted_private_key": u.encrypted_private_key,
+        "public_key": u.public_key,
+        "admin": u.admin,
+        "pbkdf2_salt": u.pbkdf2_salt,
+        "aes_iv": u.aes_iv,
+    }
+
+    return jsonify(user=user)

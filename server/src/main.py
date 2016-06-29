@@ -55,15 +55,16 @@ def add_user():
 
     encrypted_private_key = cypher.encrypt(private.exportKey())
 
-    u.public_key = public.exportKey()
-    u.encrypted_private_key = base64.b64encode(encrypted_private_key)
-    u.pbkdf2_salt = base64.b64encode(salt)
-    u.aes_iv = base64.b64encode(iv)
+    u.public_key = public.exportKey().decode("UTF-8")
+    u.encrypted_private_key = base64.b64encode(encrypted_private_key).decode(
+        "UTF-8")
+    u.pbkdf2_salt = base64.b64encode(salt).decode("UTF-8")
+    u.aes_iv = base64.b64encode(iv).decode("UTF-8")
 
     auth_key = binascii.hexlify(hashlib.pbkdf2_hmac("sha512",
         password.encode("UTF-8"), u.username.encode("UTF-8"), 100000))
 
-    u.auth_hash = bcrypt.hashpw(auth_key, bcrypt.gensalt())
+    u.auth_hash = bcrypt.hashpw(auth_key, bcrypt.gensalt()).decode("UTF-8")
 
     print("Done!")
     print("Adding user...", end="")

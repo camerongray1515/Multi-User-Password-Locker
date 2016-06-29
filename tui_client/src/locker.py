@@ -14,7 +14,7 @@ class LockerEntity():
         raise NotImplementedError
 
     def __repr__(self):
-        return str(self.to_dict())
+        return "<class '{}': {}>".format(self.__class__.__name__, str(self.to_dict()))
 
 class FolderPermission(LockerEntity):
     def __init__(self, user_id, read, write):
@@ -36,6 +36,34 @@ class Folder(LockerEntity):
 
     def to_dict(self):
         return {"name": self.name, "id": self.id}
+
+class User(LockerEntity):
+    def __init__(self, id, full_name, username, email, auth_hash,
+        encrypted_private_key, public_key, admin, pbkdf2_salt, aes_iv):
+        self.id = id
+        self.full_name = full_name
+        self.username = username
+        self.email = email
+        self.auth_hash = auth_hash
+        self.encrypted_private_key = encrypted_private_key
+        self.public_key = public_key
+        self.admin = admin
+        self.pbkdf2_salt = pbkdf2_salt
+        self.aes_iv = aes_iv
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "full_name": self.full_name,
+            "username": self.username,
+            "email": self.email,
+            "auth_hash": self.auth_hash,
+            "encrypted_private_key": self.encrypted_private_key,
+            "public_key": self.public_key,
+            "admin": self.admin,
+            "pbkdf2_salt": self.pbkdf2_salt,
+            "aes_iv": self.aes_iv,
+        }
 
 
 class Locker:
@@ -107,12 +135,29 @@ class Locker:
 
         return True
 
+    def get_user(self, user_id=None):
+        url = self._get_url("users" + (
+            "/{}".format(user_id) if user_id else ""))
+
+        r = requests.get(url, auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        u = r["user"]
+
+        user = User(u["id"], u["full_name"], u["username"], u["email"],
+            u["auth_hash"], u["encrypted_private_key"], u["public_key"],
+            u["admin"], u["pbkdf2_salt"], u["aes_iv"])
+
+        return user
+
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     try:
         # p = FolderPermission(user_id=1, read=True, write=True)
         # l.set_folder_permissions(1, p)
-        print(l.add_folder(Folder("Second test folder")).to_dict())
+        # print(l.add_folder(Folder("Second test folder")).to_dict())
+        print(l.get_user())
     except RequestFailedError as ex:
         print(ex.error_type)
         print(str(ex))
