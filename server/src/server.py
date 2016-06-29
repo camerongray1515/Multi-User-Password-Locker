@@ -43,39 +43,33 @@ def folders_add(user):
             "add a folder")
 
     schema = {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"}
-            },
-            "required": ["name"]
-        }
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"}
+        },
+        "required": ["name"]
     }
 
     error = validate_schema(request.json, schema)
     if error:
         return error
 
-    added_folder_ids = []
-    for folder in request.json:
-        if Folder.query.filter(Folder.name==folder.get("name")).count():
-            return error_response("already_exists", "A folder with that name "
-                "already exists")
+    folder = request.json
+    if Folder.query.filter(Folder.name==folder.get("name")).count():
+        return error_response("already_exists", "A folder with that name "
+            "already exists")
 
-        f = Folder(name=folder.get("name"))
-        db_session.add(f)
+    f = Folder(name=folder.get("name"))
+    db_session.add(f)
 
-        # Give the creating user read/write permissions to the folder
-        db_session.flush()
-        db_session.add(Permission(read=True, write=True, user_id=user.id,
-            folder_id=f.id))
-
-        added_folder_ids.append(f.id)
+    # Give the creating user read/write permissions to the folder
+    db_session.flush()
+    db_session.add(Permission(read=True, write=True, user_id=user.id,
+        folder_id=f.id))
 
     db_session.commit()
 
-    return jsonify(success=True, added_folder_ids=added_folder_ids)
+    return jsonify(success=True, folder_id=f.id)
 
 @server.route("/folders/set_permissions/", methods=["POST"])
 @auth_required(admin_required=True)

@@ -4,6 +4,11 @@ import hashlib
 import binascii
 from urllib.parse import urljoin
 
+class RequestFailedError(Exception):
+    def __init__(self, error_type, message):
+        super(RequestFailedError, self).__init__(message)
+        self.error_type = error_type
+
 class Locker:
     def __init__(self, server, port, username, password):
         self.server = server
@@ -23,10 +28,28 @@ class Locker:
             endpoint)
         return url
 
+    def _check_errors(self, r):
+        if r.get("error"):
+            raise RequestFailedError(r.get("error"), r.get("message"))
+        return True
+
     def get_folders(self):
-        r = requests.get(self._get_url("folders"), auth=self._get_auth())
-        return r.json()
+        r = requests.get(self._get_url("folders"), auth=self._get_auth()).json()
+        return r["folders"]
+
+    def add_folder(self, name):
+        r = requests.put(self._get_url("folders/add"), json={"name": name},
+            auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        return r.get("folder_id")
 
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     print(l.get_folders())
+    try:
+        print(l.add_folder("Second Test Folder"))
+    except RequestFailedError as ex:
+        print(ex.error_type)
+        print(str(ex))
