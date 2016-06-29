@@ -45,11 +45,20 @@ class Locker:
 
         return r.get("folder_id")
 
+    def delete_folder(self, folder_id):
+        r = requests.delete(
+            self._get_url("folders/delete/{}".format(folder_id)),
+            auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        return True
+
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
-    print(l.get_folders())
     try:
-        print(l.add_folder("Second Test Folder"))
+        print(l.delete_folder(2))
     except RequestFailedError as ex:
         print(ex.error_type)
         print(str(ex))
+    print(l.get_folders())
