@@ -6,6 +6,7 @@ from models import db_session
 
 error_codes = {
     "not_admin": 401,
+    "no_write_permission": 401,
     "input_validation_fail": 400,
     "no_request_data": 400,
     "already_exists": 409,

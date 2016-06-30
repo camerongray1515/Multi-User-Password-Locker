@@ -71,6 +71,12 @@ class Folder(Base):
     def __repr__(self):
         return "<Folder id: {}, name: {}>".format(self.id, self.name)
 
+    def user_can_write(self, user):
+        for p in self.permissions:
+            if p.user.id == user.id and p.write:
+                return True
+        return False
+
 
 class Permission(Base):
     __tablename__ = "permissions"

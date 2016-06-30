@@ -87,7 +87,7 @@ class Account(LockerEntity):
             "notes": self.notes,
         }
 
-    def encrypt(self, public_key):
+    def get_encrypted(self, public_key):
         iv = os.urandom(16)
         key = os.urandom(32)
         aes_cypher = AES.new(key, AES.MODE_CFB, iv)
@@ -106,11 +106,11 @@ class Account(LockerEntity):
             "iv": base64_string(key)
         }).encode("UTF-8"))
 
-        return (
-            base64_string(encrypted_aes_key),
-            base64_string(encrypted_metadata),
-            base64_string(encrypted_password)
-        )
+        return {
+            "encrypted_aes_key": base64_string(encrypted_aes_key),
+            "encrypted_metadata": base64_string(encrypted_metadata),
+            "encrypted_password": base64_string(encrypted_password)
+        }
 
 
 class Locker:
@@ -206,6 +206,32 @@ class Locker:
 
         return user
 
+    def add_account(self, folder_id, account):
+        public_keys = l._folder_public_keys(folder_id)
+
+        encrypted_account_data = []
+
+        for pk in public_keys:
+            encrypted = account.get_encrypted(pk["public_key"])
+            encrypted_account_data.append({
+                "encrypted_aes_key": encrypted["encrypted_aes_key"],
+                "account_metadata": encrypted["encrypted_metadata"],
+                "password": encrypted["encrypted_password"],
+                "user_id": pk["user_id"]
+            })
+
+        data = {
+            "folder_id": folder_id,
+            "encrypted_account_data": encrypted_account_data
+        }
+
+        r = requests.put(self._get_url("accounts/add"), json=data,
+            auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        return r["account_id"]
+
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     try:
@@ -213,10 +239,9 @@ if __name__ == "__main__":
         # l.set_folder_permissions(1, p)
         # print(l.add_folder(Folder("Second test folder")).to_dict())
         # print(l.get_user())
-        key = l._folder_public_keys(1)[0]["public_key"]
 
-        a = Account("Test Account", "camerongray", "secretpass", "Butts")
-        print(a.encrypt(key))
+        a = Account("Second Test Account", "camerongray", "secretpass", "Butts")
+        print(l.add_account(2, a))
 
     except RequestFailedError as ex:
         print(ex.error_type)

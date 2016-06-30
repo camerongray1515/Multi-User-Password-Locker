@@ -1,4 +1,5 @@
-from models import db_session, create_all, init, User, Folder, Permission
+from models import db_session, create_all, init, User, Folder, Permission,\
+    Account, AccountDataItem
 from flask import Flask, jsonify, request, make_response
 from decorators import auth_required
 from validation import error_response, validate_schema
@@ -75,13 +76,13 @@ def folders_set_permissions(user):
 
     schema = {
         "type": "object",
-        "properies": {
+        "properties": {
             "folder_id": {"type": "integer"},
             "permissions": {
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "properies": {
+                    "properties": {
                         "user_id": {"type": "integer"},
                         "read": {"type": "boolean"},
                         "write": {"type": "boolean"}
@@ -203,6 +204,10 @@ def folders_public_keys(user, folder_id):
     if not f:
         return error_response("item_not_found", "Folder not found")
 
+    if not f.user_can_write(user):
+        return error_response("no_write_permission", "You do not have write "
+            "permission for this folder")
+
     public_keys = []
 
     for p in f.permissions:
@@ -212,3 +217,58 @@ def folders_public_keys(user, folder_id):
         })
 
     return jsonify(public_keys=public_keys)
+
+@server.route("/accounts/add/", methods=["PUT"])
+@auth_required
+def accounts_add(user):
+    schema = {
+        "type": "object",
+        "properties": {
+            "folder_id": {"type": "integer"},
+            "encrypted_account_data": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {"type": "integer"},
+                        "password": {"type": "string"},
+                        "account_metadata": {"type": "string"},
+                        "encrypted_aes_key": {"type": "string"},
+                    },
+                    "required": ["user_id", "password", "encrypted_aes_key",
+                        "account_metadata"]
+                }
+            }
+        },
+        "required": ["folder_id", "encrypted_account_data"]
+    }
+
+    error = validate_schema(request.json, schema)
+
+    folder_id = request.json["folder_id"]
+    encrypted_account_data = request.json["encrypted_account_data"]
+
+    f = Folder.query.get(folder_id)
+    if not f:
+        return error_response("item_not_found", "Folder not found")
+
+    if not f.user_can_write(user):
+        return error_response("no_write_permission", "You do not have write "
+            "permission for this folder")
+
+    a = Account(folder_id=folder_id)
+    db_session.add(a)
+    db_session.flush()
+
+    for item in encrypted_account_data:
+        db_session.add(AccountDataItem(
+            user_id=item["user_id"],
+            account_id=a.id,
+            password=item["password"],
+            account_metadata=item["account_metadata"],
+            encrypted_aes_key=item["encrypted_aes_key"],
+        ))
+
+    db_session.commit()
+
+    return jsonify(account_id=a.id)
