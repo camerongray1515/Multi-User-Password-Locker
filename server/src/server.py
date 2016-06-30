@@ -195,3 +195,20 @@ def get_user(user, user_id=None):
     }
 
     return jsonify(user=user)
+
+@server.route("/folders/<folder_id>/public_keys/", methods=["GET"])
+@auth_required
+def folders_public_keys(user, folder_id):
+    f = Folder.query.get(folder_id)
+    if not f:
+        return error_response("item_not_found", "Folder not found")
+
+    public_keys = []
+
+    for p in f.permissions:
+        public_keys.append({
+            "user_id": p.user.id,
+            "public_key": p.user.public_key
+        })
+
+    return jsonify(public_keys=public_keys)

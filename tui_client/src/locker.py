@@ -2,12 +2,19 @@ import requests
 import json
 import hashlib
 import binascii
+import os
+import base64
 from urllib.parse import urljoin
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.PublicKey import RSA
 
 class RequestFailedError(Exception):
     def __init__(self, error_type, message):
         super(RequestFailedError, self).__init__(message)
         self.error_type = error_type
+
+def base64_string(to_encode):
+    return base64.b64encode(to_encode).decode("UTF-8")
 
 class LockerEntity():
     def to_dict(self):
@@ -65,6 +72,46 @@ class User(LockerEntity):
             "aes_iv": self.aes_iv,
         }
 
+class Account(LockerEntity):
+    def __init__(self, name, username, password, notes):
+        self.name = name
+        self.username = username
+        self.password = password
+        self.notes = notes
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "username": self.username,
+            "password": self.password,
+            "notes": self.notes,
+        }
+
+    def encrypt(self, public_key):
+        iv = os.urandom(16)
+        key = os.urandom(32)
+        aes_cypher = AES.new(key, AES.MODE_CFB, iv)
+
+        encrypted_password = aes_cypher.encrypt(self.password)
+        encrypted_metadata = aes_cypher.encrypt(json.dumps({
+            "name": self.name,
+            "username": self.username,
+            "notes": self.notes
+        }))
+
+        rsa_key = RSA.importKey(public_key)
+        rsa_cypher = PKCS1_OAEP.new(rsa_key)
+        encrypted_aes_key = rsa_cypher.encrypt(json.dumps({
+            "key": base64_string(key),
+            "iv": base64_string(key)
+        }).encode("UTF-8"))
+
+        return (
+            base64_string(encrypted_aes_key),
+            base64_string(encrypted_metadata),
+            base64_string(encrypted_password)
+        )
+
 
 class Locker:
     def __init__(self, server, port, username, password):
@@ -89,6 +136,14 @@ class Locker:
         if r.get("error"):
             raise RequestFailedError(r.get("error"), r.get("message"))
         return True
+
+    def _folder_public_keys(self, folder_id):
+        r = requests.get(self._get_url("folders/{}/public_keys/".format(
+            folder_id)), auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        return r["public_keys"]
 
     def get_folders(self):
         r = requests.get(self._get_url("folders"), auth=self._get_auth()).json()
@@ -154,10 +209,15 @@ class Locker:
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     try:
-        # p = FolderPermission(user_id=1, read=True, write=True)
+        # p = FolderPermission(user_id=2, read=True, write=False)
         # l.set_folder_permissions(1, p)
         # print(l.add_folder(Folder("Second test folder")).to_dict())
-        print(l.get_user())
+        # print(l.get_user())
+        key = l._folder_public_keys(1)[0]["public_key"]
+
+        a = Account("Test Account", "camerongray", "secretpass", "Butts")
+        print(a.encrypt(key))
+
     except RequestFailedError as ex:
         print(ex.error_type)
         print(str(ex))
