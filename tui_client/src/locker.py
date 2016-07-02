@@ -7,6 +7,7 @@ import base64
 from urllib.parse import urljoin
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
+from pbkdf2 import PBKDF2
 
 class RequestFailedError(Exception):
     def __init__(self, error_type, message):
@@ -46,7 +47,8 @@ class Folder(LockerEntity):
 
 class User(LockerEntity):
     def __init__(self, id, full_name, username, email, auth_hash,
-        encrypted_private_key, public_key, admin, pbkdf2_salt, aes_iv):
+        encrypted_private_key, public_key, admin, pbkdf2_salt, aes_iv,
+        private_key=None):
         self.id = id
         self.full_name = full_name
         self.username = username
@@ -57,6 +59,7 @@ class User(LockerEntity):
         self.admin = admin
         self.pbkdf2_salt = pbkdf2_salt
         self.aes_iv = aes_iv
+        self.private_key = private_key
 
     def to_dict(self):
         return {
@@ -70,14 +73,16 @@ class User(LockerEntity):
             "admin": self.admin,
             "pbkdf2_salt": self.pbkdf2_salt,
             "aes_iv": self.aes_iv,
+            "private_key": self.private_key,
         }
 
 class Account(LockerEntity):
-    def __init__(self, name, username, password, notes):
+    def __init__(self, name, username, password, notes, account_id=None):
         self.name = name
         self.username = username
         self.password = password
         self.notes = notes
+        self.account_id = account_id
 
     def to_dict(self):
         return {
@@ -85,15 +90,15 @@ class Account(LockerEntity):
             "username": self.username,
             "password": self.password,
             "notes": self.notes,
+            "account_id": self.account_id
         }
 
     def get_encrypted(self, public_key):
         iv = os.urandom(16)
         key = os.urandom(32)
-        aes_cypher = AES.new(key, AES.MODE_CFB, iv)
-
-        encrypted_password = aes_cypher.encrypt(self.password)
-        encrypted_metadata = aes_cypher.encrypt(json.dumps({
+        encrypted_password = AES.new(key, AES.MODE_CFB, iv).encrypt(
+            self.password)
+        encrypted_metadata = AES.new(key, AES.MODE_CFB, iv).encrypt(json.dumps({
             "name": self.name,
             "username": self.username,
             "notes": self.notes
@@ -103,7 +108,7 @@ class Account(LockerEntity):
         rsa_cypher = PKCS1_OAEP.new(rsa_key)
         encrypted_aes_key = rsa_cypher.encrypt(json.dumps({
             "key": base64_string(key),
-            "iv": base64_string(key)
+            "iv": base64_string(iv)
         }).encode("UTF-8"))
 
         return {
@@ -118,6 +123,7 @@ class Locker:
         self.server = server
         self.port = port
         self.username = username
+        self.password = password
         self.auth_key = binascii.hexlify(hashlib.pbkdf2_hmac("sha512",
             password.encode("UTF-8"), username.encode("UTF-8"), 100000)).decode(
                 "UTF-8")
@@ -190,9 +196,8 @@ class Locker:
 
         return True
 
-    def get_user(self, user_id=None):
-        url = self._get_url("users" + (
-            "/{}".format(user_id) if user_id else ""))
+    def get_current_user(self):
+        url = self._get_url("users")
 
         r = requests.get(url, auth=self._get_auth()).json()
 
@@ -200,9 +205,27 @@ class Locker:
 
         u = r["user"]
 
-        user = User(u["id"], u["full_name"], u["username"], u["email"],
-            u["auth_hash"], u["encrypted_private_key"], u["public_key"],
-            u["admin"], u["pbkdf2_salt"], u["aes_iv"])
+        pbkdf2_salt = base64.b64decode(u["pbkdf2_salt"])
+        aes_iv = base64.b64decode(u["aes_iv"])
+        encrypted_private_key = base64.b64decode(u["encrypted_private_key"])
+
+        key = PBKDF2(self.password, pbkdf2_salt).read(32)
+        cypher = AES.new(key, AES.MODE_CFB, aes_iv)
+        private_key = cypher.decrypt(encrypted_private_key)
+
+        user = User(
+            u["id"],
+            u["full_name"],
+            u["username"],
+            u["email"],
+            u["auth_hash"],
+            encrypted_private_key,
+            u["public_key"],
+            u["admin"],
+            pbkdf2_salt,
+            aes_iv,
+            private_key,
+        )
 
         return user
 
@@ -232,6 +255,33 @@ class Locker:
 
         return r["account_id"]
 
+    def get_folder_accounts(self, folder_id, private_key):
+        r = requests.get(self._get_url("folders/{}/accounts/".format(
+            folder_id)), auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        rsa_key = RSA.importKey(private_key)
+        rsa_cypher = PKCS1_OAEP.new(rsa_key)
+
+        accounts = []
+        for a in r["accounts"]:
+            aes_key = json.loads(rsa_cypher.decrypt(base64.b64decode(
+                a["encrypted_aes_key"])).decode("UTF-8"))
+            aes_cypher = AES.new(base64.b64decode(aes_key["key"]), AES.MODE_CFB,
+                base64.b64decode(aes_key["iv"]))
+            metadata = json.loads(aes_cypher.decrypt(base64.b64decode(
+                a["account_metadata"])).decode("UTF-8"))
+            accounts.append(Account(
+                name=metadata["name"],
+                username=metadata["username"],
+                notes=metadata["notes"],
+                account_id=a["id"],
+                password=None,
+            ))
+
+        return accounts
+
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     try:
@@ -240,8 +290,12 @@ if __name__ == "__main__":
         # print(l.add_folder(Folder("Second test folder")).to_dict())
         # print(l.get_user())
 
-        a = Account("Second Test Account", "camerongray", "secretpass", "Butts")
-        print(l.add_account(2, a))
+        # a = Account("Second Folder Account", "camerongray", "anotherpass", "Butts")
+        # print(l.add_account(2, a))
+
+
+        u = l.get_current_user()
+        print(l.get_folder_accounts(1, u.private_key))
 
     except RequestFailedError as ex:
         print(ex.error_type)

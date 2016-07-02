@@ -205,8 +205,8 @@ def folders_public_keys(user, folder_id):
         return error_response("item_not_found", "Folder not found")
 
     if not f.user_can_write(user):
-        return error_response("no_write_permission", "You do not have write "
-            "permission for this folder")
+        return error_response("insufficient_permissions", "You do not have "
+            "write permission for this folder")
 
     public_keys = []
 
@@ -253,8 +253,8 @@ def accounts_add(user):
         return error_response("item_not_found", "Folder not found")
 
     if not f.user_can_write(user):
-        return error_response("no_write_permission", "You do not have write "
-            "permission for this folder")
+        return error_response("insufficient_permissions", "You do not have "
+            "write permission for this folder")
 
     a = Account(folder_id=folder_id)
     db_session.add(a)
@@ -272,3 +272,32 @@ def accounts_add(user):
     db_session.commit()
 
     return jsonify(account_id=a.id)
+
+@server.route("/folders/<folder_id>/accounts/", methods=["GET"])
+@auth_required
+def folder_get_accounts(user, folder_id):
+    f = Folder.query.get(folder_id)
+    if not f:
+        return error_response("item_not_found", "Folder not found")
+
+    if not f.user_can_read(user):
+        return error_response("insufficient_permissions", "You do not have "
+            "read permission for this folder")
+
+    accounts = []
+    for a in f.accounts:
+        try:
+            ad = AccountDataItem.query.filter(AccountDataItem.account_id==a.id
+                ).filter(AccountDataItem.user_id==user.id).one()
+        except (NoResultFound, MultipleResultsFound):
+            return error_response("corrupt_account", "The account you are "
+                "attempting to load appears to be corrupt, please ask your "
+                "administrator to rebuild this folder")
+
+        accounts.append({
+            "account_metadata": ad.account_metadata,
+            "encrypted_aes_key": ad.encrypted_aes_key,
+            "id": a.id,
+        })
+
+    return jsonify(accounts=accounts)

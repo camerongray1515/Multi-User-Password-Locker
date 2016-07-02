@@ -6,11 +6,12 @@ from models import db_session
 
 error_codes = {
     "not_admin": 401,
-    "no_write_permission": 401,
+    "insufficient_permissions": 401,
     "input_validation_fail": 400,
     "no_request_data": 400,
     "already_exists": 409,
     "item_not_found": 404,
+    "corrupt_account": 500,
 }
 
 def error_response(error, message=""):

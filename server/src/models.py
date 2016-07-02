@@ -77,6 +77,12 @@ class Folder(Base):
                 return True
         return False
 
+    def user_can_read(self, user):
+        for p in self.permissions:
+            if p.user.id == user.id and p.read:
+                return True
+        return False
+
 
 class Permission(Base):
     __tablename__ = "permissions"
