@@ -77,12 +77,12 @@ class User(LockerEntity):
         }
 
 class Account(LockerEntity):
-    def __init__(self, name, username, password, notes, account_id=None):
+    def __init__(self, name, username, password, notes, id=None):
         self.name = name
         self.username = username
         self.password = password
         self.notes = notes
-        self.account_id = account_id
+        self.id = id
 
     def to_dict(self):
         return {
@@ -90,7 +90,7 @@ class Account(LockerEntity):
             "username": self.username,
             "password": self.password,
             "notes": self.notes,
-            "account_id": self.account_id
+            "id": self.id
         }
 
     def get_encrypted(self, public_key):
@@ -150,6 +150,11 @@ class Locker:
         self._check_errors(r)
 
         return r["public_keys"]
+
+    def check_auth(self):
+        r = requests.get(self._get_url("check_auth"), auth=self._get_auth())
+
+        return r.status_code != 401
 
     def get_folders(self):
         r = requests.get(self._get_url("folders"), auth=self._get_auth()).json()
@@ -256,6 +261,7 @@ class Locker:
         return r["account_id"]
 
     def get_folder_accounts(self, folder_id, private_key):
+
         r = requests.get(self._get_url("folders/{}/accounts/".format(
             folder_id)), auth=self._get_auth()).json()
 
@@ -273,7 +279,7 @@ class Locker:
                 name=metadata["name"],
                 username=metadata["username"],
                 notes=metadata["notes"],
-                account_id=a["id"],
+                id=a["id"],
                 password=None,
             ))
 

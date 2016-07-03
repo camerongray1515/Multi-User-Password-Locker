@@ -325,3 +325,8 @@ def accounts_get_password(user, account_id):
         "encrypted_password": ad.password,
         "encrypted_aes_key": ad.encrypted_aes_key,
     })
+
+@server.route("/check_auth/", methods=["GET"])
+@auth_required
+def check_auth(user):
+    return jsonify(success=True)
