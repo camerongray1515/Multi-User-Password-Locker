@@ -266,12 +266,9 @@ class Locker:
 
         accounts = []
         for a in r["accounts"]:
-            aes_key = json.loads(rsa_cypher.decrypt(base64.b64decode(
-                a["encrypted_aes_key"])).decode("UTF-8"))
-            aes_cypher = AES.new(base64.b64decode(aes_key["key"]), AES.MODE_CFB,
-                base64.b64decode(aes_key["iv"]))
-            metadata = json.loads(aes_cypher.decrypt(base64.b64decode(
-                a["account_metadata"])).decode("UTF-8"))
+            metadata = json.loads(
+                self._decrypt_account_data(private_key, a["encrypted_aes_key"],
+                    a["account_metadata"]))
             accounts.append(Account(
                 name=metadata["name"],
                 username=metadata["username"],
@@ -282,11 +279,34 @@ class Locker:
 
         return accounts
 
+    def get_account_password(self, account_id, private_key):
+        r = requests.get(self._get_url("accounts/{}/password/".format(
+            account_id)), auth=self._get_auth()).json()
+
+        self._check_errors(r)
+
+        password = self._decrypt_account_data(private_key,
+            r["password"]["encrypted_aes_key"],
+            r["password"]["encrypted_password"])
+
+        return password
+
+    def _decrypt_account_data(self, private_key, encrypted_aes_key, data):
+        rsa_key = RSA.importKey(private_key)
+        rsa_cypher = PKCS1_OAEP.new(rsa_key)
+
+        aes_key = json.loads(rsa_cypher.decrypt(base64.b64decode(
+            encrypted_aes_key)).decode("UTF-8"))
+        aes_cypher = AES.new(base64.b64decode(aes_key["key"]), AES.MODE_CFB,
+            base64.b64decode(aes_key["iv"]))
+
+        return aes_cypher.decrypt(base64.b64decode(data)).decode("UTF-8")
+
 if __name__ == "__main__":
     l = Locker("127.0.0.1", 5000, "camerongray", "password")
     try:
-        # p = FolderPermission(user_id=2, read=True, write=False)
-        # l.set_folder_permissions(1, p)
+        # p = FolderPermission(user_id=1, read=True, write=True)
+        # l.set_folder_permissions(2, p)
         # print(l.add_folder(Folder("Second test folder")).to_dict())
         # print(l.get_user())
 
@@ -295,7 +315,8 @@ if __name__ == "__main__":
 
 
         u = l.get_current_user()
-        print(l.get_folder_accounts(1, u.private_key))
+        # print(l.get_folder_accounts(1, u.private_key))
+        print(l.get_account_password(3, u.private_key))
 
     except RequestFailedError as ex:
         print(ex.error_type)

@@ -301,3 +301,27 @@ def folder_get_accounts(user, folder_id):
         })
 
     return jsonify(accounts=accounts)
+
+@server.route("/accounts/<account_id>/password/", methods=["GET"])
+@auth_required
+def accounts_get_password(user, account_id):
+    a = Account.query.get(account_id)
+    if not a:
+        return error_response("item_not_found", "Account not found")
+
+    if not a.folder.user_can_read(user):
+        return error_response("insufficient_permissions", "You do not have read"
+            " permission for this folder")
+
+    try:
+        ad = AccountDataItem.query.filter(AccountDataItem.account_id==a.id
+            ).filter(AccountDataItem.user_id==user.id).one()
+    except (NoResultFound, MultipleResultsFound):
+        return error_response("corrupt_account", "The account you are "
+            "attempting to load appears to be corrupt, please ask your "
+            "administrator to rebuild this folder")
+
+    return jsonify(password={
+        "encrypted_password": ad.password,
+        "encrypted_aes_key": ad.encrypted_aes_key,
+    })
