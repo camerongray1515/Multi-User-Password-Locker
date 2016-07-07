@@ -235,7 +235,7 @@ class Locker:
         return user
 
     def add_account(self, folder_id, account):
-        public_keys = l._folder_public_keys(folder_id)
+        public_keys = self._folder_public_keys(folder_id)
 
         encrypted_account_data = []
 

@@ -1,5 +1,5 @@
 import sys
-from locker import Locker
+from locker import Locker, Folder, Account
 from getpass import getpass
 from tabulate import tabulate
 
@@ -20,6 +20,11 @@ def main():
         username = input("Username: ")
         password = getpass("Password: ")
 
+        server = "localhost"
+        port = 5000
+        # username = "camerongray"
+        # password = "password"
+
         l = Locker(server, int(port), username, password)
         auth_correct = l.check_auth()
 
@@ -36,12 +41,16 @@ def folder_list():
         for folder in l.get_folders():
             table.append([folder.id, folder.name])
         print(tabulate(table, headers=["ID", "Name"]))
-        folder_id = input("ID of folder to view (or 'q' to quit): ")
+        folder_id = input("ID of folder to view ('q' to quit, 'a' to add "
+            "folder): ")
 
         if folder_id == "q":
             sys.exit()
-
-        account_list(folder_id)
+        elif folder_id == "a":
+            folder_name = input("Enter name for folder: ")
+            l.add_folder(Folder(folder_name))
+        else:
+            account_list(folder_id)
 
 def account_list(folder_id):
     while True:
@@ -51,13 +60,24 @@ def account_list(folder_id):
             table.append([account.id, account.name, account.username])
         print(tabulate(table, headers=["ID", "Name", "Username"]))
         account_id = input("ID of account to get password for "
-            "(or 'b' to go back): ")
+            "('b' to go back, 'a' to add an account): ")
 
         if account_id == "b":
             return
-
-        print("Password: {}".format(l.get_account_password(account_id,
-            user.private_key)))
+        elif account_id == "a":
+            account_name = input("Account name: ")
+            account_username = input("Username: ")
+            account_password = getpass("Password: ")
+            account_notes = input("Notes: ")
+            l.add_account(folder_id, Account(
+                name = account_name,
+                username = account_username,
+                password = account_password,
+                notes = account_notes
+            ))
+        else:
+            print("Password: {}".format(l.get_account_password(account_id,
+                user.private_key)))
 
 if __name__ == "__main__":
     main()
