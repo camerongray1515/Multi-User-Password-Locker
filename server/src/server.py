@@ -51,6 +51,11 @@ def folders_add(user):
         return error
 
     folder = request.json
+
+    if not folder.get("name").strip():
+        return error_response("input_validation_fail", "You must supply a name "
+            "for this folder");
+
     if Folder.query.filter(Folder.name==folder.get("name")).count():
         return error_response("already_exists", "A folder with that name "
             "already exists")
@@ -141,7 +146,7 @@ def folders_set_permissions(user):
 def folders_delete(folder_id, user):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
-            "add a folder")
+            "delete a folder")
 
     f = Folder.query.get(folder_id)
     if not f:

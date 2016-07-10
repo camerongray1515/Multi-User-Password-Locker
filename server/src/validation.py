@@ -22,7 +22,8 @@ def error_response(error, message=""):
 
 def validate_schema(data, schema):
     if not data:
-        return error_response("no_request_data")
+        return error_response("no_request_data", "No data was supplied with "
+            "this request")
     try:
         validate(data, schema)
     except ValidationError as e:
