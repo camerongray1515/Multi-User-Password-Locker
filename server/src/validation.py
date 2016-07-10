@@ -5,6 +5,7 @@ from models import db_session
 # Keep all error responses in one place to maintain consistency across endpoints
 
 error_codes = {
+    "bad_credentials": 401,
     "not_admin": 401,
     "insufficient_permissions": 401,
     "input_validation_fail": 400,

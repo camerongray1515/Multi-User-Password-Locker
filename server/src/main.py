@@ -61,7 +61,7 @@ def add_user():
     u.pbkdf2_salt = base64.b64encode(salt).decode("UTF-8")
     u.aes_iv = base64.b64encode(iv).decode("UTF-8")
 
-    auth_key = binascii.hexlify(hashlib.pbkdf2_hmac("sha512",
+    auth_key = base64.b64encode(hashlib.pbkdf2_hmac("sha512",
         password.encode("UTF-8"), u.username.encode("UTF-8"), 100000))
 
     u.auth_hash = bcrypt.hashpw(auth_key, bcrypt.gensalt()).decode("UTF-8")
@@ -84,7 +84,7 @@ def main():
 
     if args.run_server:
         init(config["connection_string"])
-        server.run(debug=True)
+        server.run(host="0.0.0.0", debug=True)
     elif args.initialise_db:
         initialise_db()
     elif args.add_user:

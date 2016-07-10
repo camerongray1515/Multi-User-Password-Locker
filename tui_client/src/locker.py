@@ -124,7 +124,7 @@ class Locker:
         self.port = port
         self.username = username
         self.password = password
-        self.auth_key = binascii.hexlify(hashlib.pbkdf2_hmac("sha512",
+        self.auth_key = base64.b64encode(hashlib.pbkdf2_hmac("sha512",
             password.encode("UTF-8"), username.encode("UTF-8"), 100000)).decode(
                 "UTF-8")
 

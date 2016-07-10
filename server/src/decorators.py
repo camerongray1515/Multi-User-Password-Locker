@@ -1,10 +1,11 @@
 import bcrypt
 from models import db_session, User
-from flask import request, Response
+from flask import request, make_response, jsonify
 from functools import wraps
 
 def fail_auth():
-    return Response('Authentication required!', 401,
+    return make_response(jsonify(error="bad_credentials",
+        message="Incorrect Username/Password"), 401,
         {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
 def auth_required(func):
