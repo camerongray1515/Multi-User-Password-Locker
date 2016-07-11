@@ -170,11 +170,10 @@ def folders(user):
 
     return jsonify(folders=folders)
 
-@server.route("/users/", methods=["GET"])
 @server.route("/users/<user_id>/", methods=["GET"])
 @auth_required
 def get_user(user, user_id=None):
-    if not user_id:
+    if user_id == "self":
         user_id = user.id
     user_id = int(user_id)
 
@@ -201,6 +200,30 @@ def get_user(user, user_id=None):
     }
 
     return jsonify(user=user)
+
+@server.route("/users/", methods=["GET"])
+@auth_required
+def get_users(user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "get users")
+
+    users = []
+    for u in User.query.all():
+        users.append({
+            "id": u.id,
+            "full_name": u.full_name,
+            "username": u.username,
+            "email": u.email,
+            "auth_hash": u.auth_hash,
+            "encrypted_private_key": u.encrypted_private_key,
+            "public_key": u.public_key,
+            "admin": u.admin,
+            "pbkdf2_salt": u.pbkdf2_salt,
+            "aes_iv": u.aes_iv,
+        })
+
+    return jsonify(users=users)
 
 @server.route("/folders/<folder_id>/public_keys/", methods=["GET"])
 @auth_required
