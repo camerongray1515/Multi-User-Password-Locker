@@ -72,71 +72,41 @@ def folders_add(user):
 
     return jsonify(success=True, folder_id=f.id)
 
-@server.route("/folders/set_permissions/", methods=["POST"])
+@server.route("/folders/<folder_id>/save/", methods=["POST"])
 @auth_required
-def folders_set_permissions(user):
+def folders_save(user, folder_id):
     if not user.admin:
         return error_response("not_admin", "You must be an administrator to "
-            "edit the permissions on a folder")
+            "update a folder")
 
     schema = {
         "type": "object",
         "properties": {
-            "folder_id": {"type": "integer"},
-            "permissions": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {"type": "integer"},
-                        "read": {"type": "boolean"},
-                        "write": {"type": "boolean"}
-                    },
-                    "required": ["user_id", "read", "write"]
-                }
-            }
+            "name": {"type": "string"}
         },
-        "required": ["folder_id", "permissions"]
+        "required": ["name"]
     }
 
     error = validate_schema(request.json, schema)
     if error:
         return error
 
-    folder_id = request.json.get("folder_id")
-
-    if not Folder.query.filter(Folder.id==folder_id).count():
+    f = Folder.query.get(folder_id)
+    if not f:
         return error_response("item_not_found", "Folder not found")
 
-    for permission in request.json.get("permissions"):
-        user_id = permission.get("user_id")
+    folder = request.json
 
-        if not User.query.filter(User.id==user_id).count():
-            return error_response("item_not_found", "User with ID {} not found"
-                "".format(user_id))
+    if not folder.get("name").strip():
+        return error_response("input_validation_fail", "You must supply a name "
+            "for this folder");
 
-        ps = Permission.query.filter(Permission.user_id==user_id).filter(
-            Permission.folder_id==folder_id).all()
-        p = ps[0] if ps else Permission()
+    if Folder.query.filter(Folder.name==folder.get("name")).filter(
+        Folder.id!=folder_id).count():
+        return error_response("already_exists", "A folder with that name "
+            "already exists")
 
-        # If no read or write, do not add permission and delete if exists
-        if not(permission.get("read") or permission.get("write")):
-            if ps:
-                db_session.delete(p)
-            continue
-
-        if permission.get("write") and not permission.get("read"):
-            return error_response("input_validation_fail", "Users must be able "
-                "to read a folder if they are to write to it")
-
-        p.user_id = user_id
-        p.folder_id = folder_id
-        p.read = permission.get("read")
-        p.write = permission.get("write")
-
-        if not ps:
-            db_session.add(p)
-
+    f.name = folder.get("name")
     db_session.commit()
 
     return jsonify(success=True)
@@ -329,6 +299,93 @@ def folder_get_accounts(user, folder_id):
         })
 
     return jsonify(accounts=accounts)
+
+@server.route("/folders/<folder_id>/permissions/", methods=["GET"])
+@auth_required
+def folder_get_permissions(user, folder_id):
+    if not user.admin:
+        return error_response("insufficient_permissions", "You must be an "
+            "admin to view permissions for a folder")
+
+    f = Folder.query.get(folder_id)
+    if not f:
+        return error_response("item_not_found", "Folder not found")
+
+    permissions = []
+    for p in f.permissions:
+        permissions.append({
+            "user_id": p.user.id,
+            "read": p.read,
+            "write": p.write,
+        })
+
+    return jsonify(permissions=permissions)
+
+@server.route("/folders/<folder_id>/permissions/", methods=["POST"])
+@auth_required
+def folders_set_permissions(user, folder_id):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "edit the permissions on a folder")
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "permissions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {"type": "integer"},
+                        "read": {"type": "boolean"},
+                        "write": {"type": "boolean"}
+                    },
+                    "required": ["user_id", "read", "write"]
+                }
+            }
+        },
+        "required": ["permissions"]
+    }
+
+    error = validate_schema(request.json, schema)
+    if error:
+        return error
+
+    if not Folder.query.filter(Folder.id==folder_id).count():
+        return error_response("item_not_found", "Folder not found")
+
+    for permission in request.json.get("permissions"):
+        user_id = permission.get("user_id")
+
+        if not User.query.filter(User.id==user_id).count():
+            return error_response("item_not_found", "User with ID {} not found"
+                "".format(user_id))
+
+        ps = Permission.query.filter(Permission.user_id==user_id).filter(
+            Permission.folder_id==folder_id).all()
+        p = ps[0] if ps else Permission()
+
+        # If no read or write, do not add permission and delete if exists
+        if not(permission.get("read") or permission.get("write")):
+            if ps:
+                db_session.delete(p)
+            continue
+
+        if permission.get("write") and not permission.get("read"):
+            return error_response("input_validation_fail", "Users must be able "
+                "to read a folder if they are to write to it")
+
+        p.user_id = user_id
+        p.folder_id = folder_id
+        p.read = permission.get("read")
+        p.write = permission.get("write")
+
+        if not ps:
+            db_session.add(p)
+
+    db_session.commit()
+
+    return jsonify(success=True)
 
 @server.route("/accounts/<account_id>/password/", methods=["GET"])
 @auth_required
