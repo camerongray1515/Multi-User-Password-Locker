@@ -94,6 +94,7 @@ class Account(LockerEntity):
         }
 
     def get_encrypted(self, public_key):
+        # TODO: Don't use urandom!
         iv = os.urandom(16)
         key = os.urandom(32)
         encrypted_password = AES.new(key, AES.MODE_CFB, iv).encrypt(
