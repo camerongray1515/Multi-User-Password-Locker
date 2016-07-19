@@ -202,7 +202,7 @@ class Locker:
         return True
 
     def get_current_user(self):
-        url = self._get_url("users")
+        url = self._get_url("users/self")
 
         r = requests.get(url, auth=self._get_auth()).json()
 
@@ -225,7 +225,7 @@ class Locker:
             u["email"],
             u["auth_hash"],
             encrypted_private_key,
-            u["public_key"],
+            base64.b64decode(u["public_key"]),
             u["admin"],
             pbkdf2_salt,
             aes_iv,
@@ -240,7 +240,7 @@ class Locker:
         encrypted_account_data = []
 
         for pk in public_keys:
-            encrypted = account.get_encrypted(pk["public_key"])
+            encrypted = account.get_encrypted(base64.b64decode(pk["public_key"]))
             encrypted_account_data.append({
                 "encrypted_aes_key": encrypted["encrypted_aes_key"],
                 "account_metadata": encrypted["encrypted_metadata"],
@@ -303,6 +303,7 @@ class Locker:
 
         aes_key = json.loads(rsa_cypher.decrypt(base64.b64decode(
             encrypted_aes_key)).decode("UTF-8"))
+        print(base64.b64encode(aes_key).decode("UTF-8"))
         aes_cypher = AES.new(base64.b64decode(aes_key["key"]), AES.MODE_CFB,
             base64.b64decode(aes_key["iv"]))
 

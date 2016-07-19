@@ -53,9 +53,9 @@ def add_user():
     iv = os.urandom(16)
     cypher = AES.new(key, AES.MODE_CFB, iv)
 
-    encrypted_private_key = cypher.encrypt(private.exportKey())
+    encrypted_private_key = cypher.encrypt(private.exportKey("DER"))
 
-    u.public_key = public.exportKey().decode("UTF-8")
+    u.public_key = base64.b64encode(public.exportKey("DER")).decode("UTF-8")
     u.encrypted_private_key = base64.b64encode(encrypted_private_key).decode(
         "UTF-8")
     u.pbkdf2_salt = base64.b64encode(salt).decode("UTF-8")
