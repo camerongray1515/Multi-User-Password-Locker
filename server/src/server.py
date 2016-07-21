@@ -216,6 +216,7 @@ def folders_public_keys(user, folder_id):
 
     return jsonify(public_keys=public_keys)
 
+# TODO: Change URL to be /folders/<folder_id>/accounts/ ????
 @server.route("/accounts/add/", methods=["PUT"])
 @auth_required
 def accounts_add(user):
