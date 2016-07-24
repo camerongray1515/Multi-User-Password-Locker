@@ -412,6 +412,33 @@ def accounts_get_password(user, account_id):
         "encrypted_aes_key": ad.encrypted_aes_key,
     })
 
+@server.route("/accounts/<account_id>/", methods=["GET"])
+@auth_required
+def get_account(user, account_id):
+    a = Account.query.get(account_id)
+    if not a:
+        return error_response("item_not_found", "Account not found")
+
+    if not a.folder.user_can_read(user):
+        return error_response("insufficient_permissions", "You do not have "
+            "read permission for the folder that this account belongs to")
+
+    try:
+        ad = AccountDataItem.query.filter(AccountDataItem.account_id==a.id
+            ).filter(AccountDataItem.user_id==user.id).one()
+    except (NoResultFound, MultipleResultsFound):
+        return error_response("corrupt_account", "The account you are "
+            "attempting to load appears to be corrupt, please ask your "
+            "administrator to rebuild this folder")
+
+    account = {
+        "account_metadata": ad.account_metadata,
+        "encrypted_aes_key": ad.encrypted_aes_key,
+        "id": a.id,
+    }
+
+    return jsonify(account=account)
+
 @server.route("/check_auth/", methods=["GET"])
 @auth_required
 def check_auth(user):
