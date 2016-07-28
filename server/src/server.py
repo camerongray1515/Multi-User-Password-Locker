@@ -273,6 +273,58 @@ def accounts_add(user):
 
     return jsonify(account_id=a.id)
 
+@server.route("/accounts/<account_id>/", methods=["POST"])
+@auth_required
+def accounts_edit(user, account_id):
+    schema = {
+        "type": "object",
+        "properties": {
+            "encrypted_account_data": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {"type": "integer"},
+                        "password": {"type": "string"},
+                        "account_metadata": {"type": "string"},
+                        "encrypted_aes_key": {"type": "string"},
+                    },
+                    "required": ["user_id", "password", "encrypted_aes_key",
+                        "account_metadata"]
+                }
+            }
+        },
+        "required": ["encrypted_account_data"]
+    }
+
+    error = validate_schema(request.json, schema)
+
+    encrypted_account_data = request.json["encrypted_account_data"]
+
+    a = Account.query.get(account_id)
+
+    if not a:
+        return error_response("item_not_found", "Account could not be found")
+
+    if not a.folder.user_can_write(user):
+        return error_response("insufficient_permissions", "You do not have "
+            "write permission for this folder")
+
+    AccountDataItem.query.filter(AccountDataItem.account_id==a.id).delete()
+
+    for item in encrypted_account_data:
+        db_session.add(AccountDataItem(
+            user_id=item["user_id"],
+            account_id=a.id,
+            password=item["password"],
+            account_metadata=item["account_metadata"],
+            encrypted_aes_key=item["encrypted_aes_key"],
+        ))
+
+    db_session.commit()
+
+    return jsonify(success=True)
+
 @server.route("/folders/<folder_id>/accounts/", methods=["GET"])
 @auth_required
 def folder_get_accounts(user, folder_id):
