@@ -73,6 +73,7 @@ def folders_add(user):
 
     return jsonify(success=True, folder_id=f.id)
 
+# TODO: Remove /save from URL
 @server.route("/folders/<folder_id>/save/", methods=["POST"])
 @auth_required
 def folders_save(user, folder_id):
@@ -112,6 +113,7 @@ def folders_save(user, folder_id):
 
     return jsonify(success=True)
 
+# TODO: Change URL to /folders/<folder_id>/
 @server.route("/folders/delete/<folder_id>/", methods=["DELETE"])
 @auth_required
 def folders_delete(folder_id, user):
@@ -321,6 +323,81 @@ def accounts_edit(user, account_id):
             encrypted_aes_key=item["encrypted_aes_key"],
         ))
 
+    db_session.commit()
+
+    return jsonify(success=True)
+
+@server.route("/accounts/", methods=["POST"])
+@auth_required
+def accounts_batch_update(user):
+    schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "account_id": {"type": "integer"},
+                "encrypted_account_data": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {"type": "integer"},
+                            "password": {"type": "string"},
+                            "account_metadata": {"type": "string"},
+                            "encrypted_aes_key": {"type": "string"},
+                        },
+                        "required": ["user_id", "password", "encrypted_aes_key",
+                            "account_metadata"]
+                    }
+                }
+            },
+            "required": ["account_id", "encrypted_account_data"]
+        }
+    }
+
+    error = validate_schema(request.json, schema)
+
+    for account in request.json:
+        encrypted_account_data = account["encrypted_account_data"]
+        account_id = account["account_id"]
+
+        a = Account.query.get(account_id)
+
+        if not a:
+            return error_response("item_not_found",
+                "Account could not be found")
+
+        if not a.folder.user_can_write(user):
+            return error_response("insufficient_permissions", "You do not have "
+                "write permission for this folder")
+
+        for item in encrypted_account_data:
+            AccountDataItem.query.filter(
+                AccountDataItem.account_id == a.id).filter(
+                AccountDataItem.user_id == item["user_id"]).delete()
+            db_session.add(AccountDataItem(
+                user_id=item["user_id"],
+                account_id=a.id,
+                password=item["password"],
+                account_metadata=item["account_metadata"],
+                encrypted_aes_key=item["encrypted_aes_key"],
+            ))
+
+    db_session.commit()
+
+    return jsonify(success=True)
+
+@server.route("/accounts/<account_id>/", methods=["DELETE"])
+@auth_required
+def accounts_delete(account_id, user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "delete an account")
+
+    a = Account.query.get(account_id)
+    if not a:
+        return error_response("item_not_found", "Account not found")
+    db_session.delete(a)
     db_session.commit()
 
     return jsonify(success=True)
