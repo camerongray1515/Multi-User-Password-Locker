@@ -72,12 +72,16 @@ class Folder(Base):
         return "<Folder id: {}, name: {}>".format(self.id, self.name)
 
     def user_can_write(self, user):
+        if user.admin:
+            return True
         for p in self.permissions:
             if p.user.id == user.id and p.write:
                 return True
         return False
 
     def user_can_read(self, user):
+        if user.admin:
+            return True
         for p in self.permissions:
             if p.user.id == user.id and p.read:
                 return True

@@ -132,14 +132,18 @@ def folders_delete(folder_id, user):
 @server.route("/folders/", methods=["GET"])
 @auth_required
 def folders(user):
-    ps = Permission.query.filter(Permission.user_id==user.id).filter(
-        Permission.read==True).all()
-
     folders = []
-    for p in ps:
-        f = p.folder
-        folders.append({"id": f.id, "name": f.name, "read": p.read,
-            "write": p.write})
+    if user.admin:
+        for f in Folder.query.all():
+            folders.append({"id": f.id, "name": f.name, "read": True,
+                "write": True})
+    else:
+        ps = Permission.query.filter(Permission.user_id==user.id).filter(
+            Permission.read==True).all()
+        for p in ps:
+            f = p.folder
+            folders.append({"id": f.id, "name": f.name, "read": p.read,
+                "write": p.write})
 
     return jsonify(folders=folders)
 
