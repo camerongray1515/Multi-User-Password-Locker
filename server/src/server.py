@@ -178,6 +178,71 @@ def get_user(user, user_id=None):
 
     return jsonify(user=user)
 
+@server.route("/users/<user_id>/encrypted_aes_keys/", methods=["GET"])
+@auth_required
+def get_encrypted_aes_keys(user, user_id=None):
+    if user_id == "self":
+        user_id = user.id
+    user_id = int(user_id)
+
+    if user_id != user.id and not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "set keys for a user other than yourself")
+
+    account_data_items = AccountDataItem.query.filter(
+        AccountDataItem.user_id == user_id)
+
+    encrypted_aes_keys = []
+    for item in account_data_items:
+        encrypted_aes_keys.append({
+            "account_id": item.account.id,
+            "encrypted_aes_key": item.encrypted_aes_key,
+        })
+
+    return jsonify(encrypted_aes_keys=encrypted_aes_keys)
+
+# TODO - Include some way to change user's stored auth hash at the same time!
+@server.route("/users/<user_id>/encrypted_aes_keys/", methods=["POST"])
+@auth_required
+def update_encrypted_aes_keys(user, user_id=None):
+    if user_id == "self":
+        user_id = user.id
+    user_id = int(user_id)
+
+    if user_id != user.id and not user.admin:
+        return error_response("not_admin", "You must be an administrator to "
+            "get keys for a user other than yourself")
+
+    schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "account_id": {"type": "integer"},
+                "encrypted_aes_key": {"type": "string"},
+            },
+            "required": ["account_id", "encrypted_aes_key"]
+        }
+    }
+
+    error = validate_schema(request.json, schema)
+    if error:
+        return error
+
+    keys = {}
+    for item in request.json:
+        keys[item["account_id"]] = item["encrypted_aes_key"]
+
+    account_data_items = AccountDataItem.query.filter(
+        AccountDataItem.user_id == user_id)
+
+    for item in account_data_items:
+        item.encrypted_aes_key = keys[item.account.id]
+
+    db_session.commit()
+
+    return jsonify(success=True)
+
 @server.route("/users/", methods=["GET"])
 @auth_required
 def get_users(user):
