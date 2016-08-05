@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request, make_response
 from decorators import auth_required
 from validation import error_response, validate_schema
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+import bcrypt
 
 server = Flask(__name__)
 
@@ -201,47 +202,79 @@ def get_encrypted_aes_keys(user, user_id=None):
 
     return jsonify(encrypted_aes_keys=encrypted_aes_keys)
 
-# TODO - Include some way to change user's stored auth hash at the same time!
-@server.route("/users/<user_id>/encrypted_aes_keys/", methods=["POST"])
+# # TODO - Include some way to change user's stored auth hash at the same time!
+# @server.route("/users/<user_id>/encrypted_aes_keys/", methods=["POST"])
+# @auth_required
+# def update_encrypted_aes_keys(user, user_id=None):
+#     if user_id == "self":
+#         user_id = user.id
+#     user_id = int(user_id)
+#
+#     if user_id != user.id and not user.admin:
+#         return error_response("not_admin", "You must be an administrator to "
+#             "get keys for a user other than yourself")
+#
+#     schema = {
+#         "type": "array",
+#         "items": {
+#             "type": "object",
+#             "properties": {
+#                 "account_id": {"type": "integer"},
+#                 "encrypted_aes_key": {"type": "string"},
+#             },
+#             "required": ["account_id", "encrypted_aes_key"]
+#         }
+#     }
+#
+#     error = validate_schema(request.json, schema)
+#     if error:
+#         return error
+#
+#     keys = {}
+#     for item in request.json:
+#         keys[item["account_id"]] = item["encrypted_aes_key"]
+#
+#     account_data_items = AccountDataItem.query.filter(
+#         AccountDataItem.user_id == user_id)
+#
+#     for item in account_data_items:
+#         item.encrypted_aes_key = keys[item.account.id]
+#
+#     db_session.commit()
+#
+#     return jsonify(success=True)
+
+@server.route("/users/self/update_password/", methods=["POST"])
 @auth_required
-def update_encrypted_aes_keys(user, user_id=None):
-    if user_id == "self":
-        user_id = user.id
-    user_id = int(user_id)
-
-    if user_id != user.id and not user.admin:
-        return error_response("not_admin", "You must be an administrator to "
-            "get keys for a user other than yourself")
-
+def users_self_update_password(user):
     schema = {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "account_id": {"type": "integer"},
-                "encrypted_aes_key": {"type": "string"},
-            },
-            "required": ["account_id", "encrypted_aes_key"]
-        }
+        "type": "object",
+        "properties": {
+            "encrypted_private_key": {"type": "string"},
+            "aes_iv": {"type": "string"},
+            "pbkdf2_salt": {"type": "string"},
+            "auth_key": {"type": "string"},
+        },
+        "required": ["encrypted_private_key", "aes_iv", "pbkdf2_salt",
+            "auth_key"]
     }
 
     error = validate_schema(request.json, schema)
     if error:
         return error
 
-    keys = {}
-    for item in request.json:
-        keys[item["account_id"]] = item["encrypted_aes_key"]
+    u = User.query.get(user.id)
 
-    account_data_items = AccountDataItem.query.filter(
-        AccountDataItem.user_id == user_id)
-
-    for item in account_data_items:
-        item.encrypted_aes_key = keys[item.account.id]
+    user.encrypted_private_key = request.json["encrypted_private_key"]
+    user.aes_iv = request.json["aes_iv"]
+    user.pbkdf2_salt = request.json["pbkdf2_salt"]
+    user.auth_hash = bcrypt.hashpw(request.json["auth_key"].encode("UTF-8"),
+        bcrypt.gensalt()).decode("UTF-8")
 
     db_session.commit()
 
     return jsonify(success=True)
+
 
 @server.route("/users/", methods=["GET"])
 @auth_required
