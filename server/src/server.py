@@ -319,6 +319,13 @@ def folders_public_keys(user, folder_id):
             "public_key": p.user.public_key
         })
 
+    admins = User.query.filter(User.admin==True)
+    for a in admins:
+        public_keys.append({
+            "user_id": a.id,
+            "public_key": a.public_key
+        })
+
     return jsonify(public_keys=public_keys)
 
 # TODO: Change URL to be /folders/<folder_id>/accounts/ ????
@@ -590,9 +597,15 @@ def folders_set_permissions(user, folder_id):
     for permission in request.json.get("permissions"):
         user_id = permission.get("user_id")
 
-        if not User.query.filter(User.id==user_id).count():
+        u = User.query.get(user_id)
+        if not u:
             return error_response("item_not_found", "User with ID {} not found"
                 "".format(user_id))
+
+        if u.admin:
+            return error_response("input_validation_fail", "Cannot set "
+                "permissions for an administrator, administrators already have "
+                "full access to all folders")
 
         ps = Permission.query.filter(Permission.user_id==user_id).filter(
             Permission.folder_id==folder_id).all()
