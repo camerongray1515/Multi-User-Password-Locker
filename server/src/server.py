@@ -300,6 +300,55 @@ def get_users(user):
 
     return jsonify(users=users)
 
+@server.route("/users/", methods=["PUT"])
+@auth_required
+def add_user(user):
+    if not user.admin:
+        return error_response("not_admin", "You must be an administrator to add"
+            " users")
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "full_name": {"type": "string"},
+            "username": {"type": "string"},
+            "email": {"type": "string"},
+            "public_key": {"type": "string"},
+            "admin": {"type": "boolean"},
+            "encrypted_private_key": {"type": "string"},
+            "aes_iv": {"type": "string"},
+            "pbkdf2_salt": {"type": "string"},
+            "auth_key": {"type": "string"},
+        },
+        "required": ["full_name", "username", "email", "public_key", "admin",
+            "encrypted_private_key", "aes_iv", "pbkdf2_salt", "auth_key"]
+    }
+
+    error = validate_schema(request.json, schema)
+    if error:
+        return error
+
+    if User.query.filter(User.username==request.json["username"]).count():
+        return error_response("already_exists", "A user with that username"
+            " already exists!")
+
+    u = User();
+    u.full_name = request.json["full_name"]
+    u.username = request.json["username"]
+    u.email = request.json["email"]
+    u.public_key = request.json["public_key"]
+    u.admin = request.json["admin"]
+    u.encrypted_private_key = request.json["encrypted_private_key"]
+    u.aes_iv = request.json["aes_iv"]
+    u.pbkdf2_salt = request.json["pbkdf2_salt"]
+    u.auth_hash = bcrypt.hashpw(request.json["auth_key"].encode("UTF-8"),
+        bcrypt.gensalt()).decode("UTF-8")
+
+    db_session.add(u)
+    db_session.commit()
+
+    return jsonify(user_id=u.id)
+
 @server.route("/folders/<folder_id>/public_keys/", methods=["GET"])
 @auth_required
 def folders_public_keys(user, folder_id):
