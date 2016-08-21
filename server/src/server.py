@@ -33,7 +33,7 @@ server = Flask(__name__)
 # completed.
 #
 
-@server.route("/folders/add/", methods=["PUT"])
+@server.route("/folders/", methods=["PUT"])
 @auth_required
 def folders_add(user):
     if not user.admin:
@@ -548,13 +548,14 @@ def accounts_batch_update(user):
 @server.route("/accounts/<account_id>/", methods=["DELETE"])
 @auth_required
 def accounts_delete(account_id, user):
-    if not user.admin:
-        return error_response("not_admin", "You must be an administrator to "
-            "delete an account")
-
     a = Account.query.get(account_id)
     if not a:
         return error_response("item_not_found", "Account not found")
+
+    if not a.folder.user_can_write(user):
+        return error_response("insufficient_permissions", "You do not have "
+            "write permission for this folder")
+
     db_session.delete(a)
     db_session.commit()
 
