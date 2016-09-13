@@ -64,12 +64,6 @@ def folders_add(user):
 
     f = Folder(name=folder.get("name"))
     db_session.add(f)
-
-    # Give the creating user read/write permissions to the folder
-    db_session.flush()
-    db_session.add(Permission(read=True, write=True, user_id=user.id,
-        folder_id=f.id))
-
     db_session.commit()
 
     return jsonify(success=True, folder_id=f.id)
